@@ -61,10 +61,16 @@ def get_candidate_relations_to_delete(opts):
 
 
 def get_fields_for_delete(model):
-    return [
-        field.name for field in model._meta.fields
+    fields = [
+        field.attname for field in model._meta.fields
         if field.primary_key or (field.concrete and field.is_relation)
     ]
+    for related in get_candidate_relations_to_delete(model._meta):
+        fields.extend(
+            field.attname for field in related.field.foreign_related_fields
+            if field.attname not in fields
+        )
+    return fields
 
 
 class Collector:
