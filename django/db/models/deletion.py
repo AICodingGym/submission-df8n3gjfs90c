@@ -61,14 +61,16 @@ def get_candidate_relations_to_delete(opts):
 
 
 def get_fields_for_delete(model):
-    fields = [
-        field.attname for field in model._meta.fields
-        if field.primary_key or (field.concrete and field.is_relation)
-    ]
+    fields = [model._meta.pk.name]
+    if signals.pre_delete.has_listeners(model) or signals.post_delete.has_listeners(model):
+        fields.extend(
+            field.name for field in model._meta.fields
+            if field.concrete and field.is_relation and not field.primary_key
+        )
     for related in get_candidate_relations_to_delete(model._meta):
         fields.extend(
-            field.attname for field in related.field.foreign_related_fields
-            if field.attname not in fields
+            field.name for field in related.field.foreign_related_fields
+            if field.name not in fields
         )
     return fields
 
