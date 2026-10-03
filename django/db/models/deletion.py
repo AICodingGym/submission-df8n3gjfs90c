@@ -60,6 +60,13 @@ def get_candidate_relations_to_delete(opts):
     )
 
 
+def get_fields_for_delete(model):
+    return [
+        field.name for field in model._meta.fields
+        if field.primary_key or (field.concrete and field.is_relation)
+    ]
+
+
 class Collector:
     def __init__(self, using):
         self.using = using
@@ -234,7 +241,7 @@ class Collector:
         """
         return related.related_model._base_manager.using(self.using).filter(
             **{"%s__in" % related.field.name: objs}
-        )
+        ).only(*get_fields_for_delete(related.related_model))
 
     def instances_with_model(self):
         for model, instances in self.data.items():

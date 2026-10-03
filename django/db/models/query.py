@@ -17,7 +17,7 @@ from django.db import (
 )
 from django.db.models import DateField, DateTimeField, sql
 from django.db.models.constants import LOOKUP_SEP
-from django.db.models.deletion import Collector
+from django.db.models.deletion import Collector, get_fields_for_delete
 from django.db.models.expressions import Case, Expression, F, Value, When
 from django.db.models.fields import AutoField
 from django.db.models.functions import Cast, Trunc
@@ -696,6 +696,7 @@ class QuerySet:
         del_query.query.clear_ordering(force_empty=True)
 
         collector = Collector(using=del_query.db)
+        del_query = del_query.only(*get_fields_for_delete(del_query.model))
         collector.collect(del_query)
         deleted, _rows_count = collector.delete()
 
