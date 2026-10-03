@@ -62,11 +62,6 @@ def get_candidate_relations_to_delete(opts):
 
 def get_fields_for_delete(model):
     fields = [model._meta.pk.name]
-    if signals.pre_delete.has_listeners(model) or signals.post_delete.has_listeners(model):
-        fields.extend(
-            field.name for field in model._meta.fields
-            if field.concrete and field.is_relation and not field.primary_key
-        )
     for related in get_candidate_relations_to_delete(model._meta):
         fields.extend(
             field.name for field in related.field.foreign_related_fields
@@ -131,6 +126,12 @@ class Collector:
             model, {}).setdefault(
             (field, value), set()).update(objs)
 
+    def has_signal_listeners(self, model):
+        return (
+            signals.pre_delete.has_listeners(model) or
+            signals.post_delete.has_listeners(model)
+        )
+
     def can_fast_delete(self, objs, from_field=None):
         """
         Determine if the objects in the given queryset-like or single object
@@ -150,8 +151,7 @@ class Collector:
             model = objs.model
         else:
             return False
-        if (signals.pre_delete.has_listeners(model) or
-                signals.post_delete.has_listeners(model) or
+        if (self.has_signal_listeners(model) or
                 signals.m2m_changed.has_listeners(model)):
             return False
         # The use of from_field comes from the need to avoid cascade back to
@@ -247,9 +247,12 @@ class Collector:
         """
         Get a QuerySet of objects related to `objs` via the relation `related`.
         """
-        return related.related_model._base_manager.using(self.using).filter(
+        sub_objs = related.related_model._base_manager.using(self.using).filter(
             **{"%s__in" % related.field.name: objs}
-        ).only(*get_fields_for_delete(related.related_model))
+        )
+        if not self.has_signal_listeners(related.related_model):
+            sub_objs = sub_objs.only(*get_fields_for_delete(related.related_model))
+        return sub_objs
 
     def instances_with_model(self):
         for model, instances in self.data.items():

@@ -696,7 +696,8 @@ class QuerySet:
         del_query.query.clear_ordering(force_empty=True)
 
         collector = Collector(using=del_query.db)
-        del_query = del_query.only(*get_fields_for_delete(del_query.model))
+        if not collector.has_signal_listeners(del_query.model):
+            del_query = del_query.only(*get_fields_for_delete(del_query.model))
         collector.collect(del_query)
         deleted, _rows_count = collector.delete()
 
